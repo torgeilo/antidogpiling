@@ -9,7 +9,7 @@ import time
 
 
 __author__ = "Torgeir Lorange Østby"
-__version__ = "1.0"
+__version__ = "1.0.1"
 __docformat__ = "restructuredtext"
 
 

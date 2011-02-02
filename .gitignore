@@ -5,3 +5,4 @@ bin/
 eggs/
 parts/
 develop-eggs/
+dist/

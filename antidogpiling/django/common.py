@@ -3,9 +3,16 @@ from antidogpiling import AntiDogpiling
 
 class Cache(AntiDogpiling):
     """
-    Django cache backend with support for anti-dogpiling. Get many, set many,
-    delete many, incr, and decr are not anti-dogpile enabled, but can be used
-    as long as they are not used on anti-dogpiled values.
+    Generic Django cache backend with support for anti-dogpiling. The actual
+    Django cache backend is inserted as a dynamic mixin. In this way, no Django
+    code needs to be re-implmeneted.
+
+    Get many, set many, and delete many are not anti-dogpilie enabled here (did
+    not bother), but they can be used as long as they are not used on
+    anti-dogpiled values.
+
+    If incr and decr were anti-dogpilied one would loose the atomic properties
+    of these in Memcached.
     """
 
     def __init__(self, CacheClass, param, params):
@@ -28,7 +35,7 @@ class Cache(AntiDogpiling):
 
     def _set_directly(self, key, value, timeout):
         """
-        Overriding as required by subclass.
+        Overriding as required by the AntiDogpiling class.
         """
 
         super(Cache, self).set(key, value, timeout=timeout)

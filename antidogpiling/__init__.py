@@ -1,16 +1,74 @@
 # -*- coding: utf-8 -*-
-
 """
 Base functionality for anti-dogpiled caching.
+
+Make anti-dogpiled cache implementations by subclassing the AntiDogpiling class
+and using its methods. A basic example with no options or validity checks::
+
+    class Cache(AntiDogpiling):
+        def __init__(self, connector):
+            self.connector = connector
+
+        def _set_directly(self, key, value, timeout):
+            self.connector.set(key, value, timeout)
+
+        def set(self, key, value, timeout):
+            value, timeout = self._add_anti_dogpiling(value, timeout)
+            self.connector.set(key, value, timeout)
+
+        def get(self, key):
+            value = self.connector.get(key)
+            if value is not None:
+                value = self._apply_anti_dogpiling(key, value)
+            return value
+
+        def delete(self, key):
+            value = self.connector.get(key)
+            if value is not None:
+                self._soft_invalidate(key, value)
+
+By using the _is_anti_dogpiled(value) function it is possible to make the anti-
+dogpiling optional, per value. For example (showing the relevant methods
+only)::
+
+    ...
+        def set(self, key, value, timeout, adp=True):
+            if adp:
+                value, timeout = self._add_anti_dogpiling(value, timeout)
+            self.connector.set(key, value, timeout)
+
+        def get(self, key):
+            value = self.connector.get(key)
+            if self._is_anti_dogpiled(value):
+                value = self._apply_anti_dogpiling(key, value)
+            return value
+
+        def delete(self, key, adp=True):
+            if adp:
+                value = self.connector.get(key)
+                if self._is_anti_dogpiled(value):
+                    self._soft_invalidate(key, value)
+                    return
+            connector.delete(key)
+    ...
+
+All timeout values provided to the anti-dogpiling methods must be relative and
+in seconds. Cache specific quirks, like the long timeouts in Memcached, must be
+handled in the subclass implementation.
+
+In addition, one can specify the grace time per value. The grace time is the
+number of seconds a client is given to try to produce a new value after the
+current value has timed out. If the client fails to produce a new value within
+the grace period, a new client is given the chance for an equally long time.
 """
-
-
-import time
 
 
 __author__ = "Torgeir Lorange Østby"
 __version__ = "1.0.1"
 __docformat__ = "restructuredtext"
+
+
+import time
 
 
 _now = lambda: int(time.time())
@@ -26,25 +84,13 @@ class Wrapper(object):
 
     def __init__(self, value, soft_timeout, hard_timeout, grace_time):
         """
-        Set the values of the wrapper.
-
-        :param value: The value to cache.
-        :param soft_timeout: Absolute timestamp after which a new value should
-                be produced.
-        :param hard_timeout: The number of seconds until the value should
-                disappear completely from the cache after it was last set or
-                read. This should be much greater than the soft timeout.
-        :param grace_time: The number of seconds a client is given to try to
-                produce a new value after the current value has timed out. If
-                the client fails to produce a new value within the grace
-                period, a new client is given the chance for an equally long
-                grace period.
+        Set the wrapper values.
         """
 
         self.value = value
-        self.soft_timeout = soft_timeout
-        self.hard_timeout = hard_timeout
-        self.grace_time = grace_time
+        self.soft_timeout = soft_timeout # Absolute
+        self.hard_timeout = hard_timeout # Relative
+        self.grace_time = grace_time # Relative
 
 
 class AntiDogpiling(object):
@@ -59,10 +105,8 @@ class AntiDogpiling(object):
         :param hard_timeout_factor: Multiplied with the soft timeout to
                 produce the hard timeout. Default is 8, so if a value should be
                 cached for 1 hour, it will actually stay in the cache for 8
-                hours. See Wrapper.soft_timeout and Wrapper.hard_timeout for
-                more information.
-        :param default_grace_time: See Wrapper.grace_time. The default is 60
-                seconds.
+                hours.
+        :param default_grace_time: The default is 60 seconds.
         """
 
         self.hard_timeout_factor = int(kwargs.pop("hard_timeout_factor", 8))
@@ -70,14 +114,8 @@ class AntiDogpiling(object):
 
     def _set_directly(self, key, value, timeout):
         """
-        Method for setting a value directly in the cache. Must be implemented
-        by the superclass. The implementation must not call any of the
-        functions below or there will be corrupted values or endless recursion.
-        
-        Typical superclass implementation::
-
-            def _set_directly(self, key, value, timeout):
-                super(Cache, self).set(key, value, timeout)
+        Some of the methods below need to be able to put values in the cache
+        directly. A subclass must implement this method in order to allow that.
         """
 
         raise NotImplementedError()
@@ -86,18 +124,6 @@ class AntiDogpiling(object):
         """
         Add a wrapper around the value with data needed later by the
         anti-dogpiling mechanisms. A new value and timeout is returned.
-
-        :param value: A value to cache.
-        :param timeout: The number of seconds the value should be cached
-                before a new value should be produced.
-        :param grace_time: See Wrapper.grace_time. If not specified, the
-                default grace time is used.
-
-        Use this function before putting the value into the cache::
-
-            if use_anti_dogpiling:
-                value, timeout = self._add_anti_dogpiling(value, timeout)
-                self.set(key, value, timeout=timeout)
         """
 
         soft_timeout = timeout + _now()
@@ -111,11 +137,7 @@ class AntiDogpiling(object):
     def _is_anti_dogpiled(self, value):
         """
         Check if the given value is wrapped in an anti-dogpiling wrapper. Use
-        it when fetching values from the cache::
-
-            if self._is_anti_dogpiled(value):
-                value = self._apply_anti_dogpiling(key, value)
-                return value
+        this when fetching values from the cache.
         """
 
         return isinstance(value, Wrapper)
@@ -123,11 +145,7 @@ class AntiDogpiling(object):
     def _apply_anti_dogpiling(self, key, value):
         """
         Apply the anti-dogpiling mechanisms to the provided key and value. Use
-        this when fetching values from the cache::
-
-            if self._is_anti_dogpiled(value):
-                value = self._apply_anti_dogpiling(key, value)
-                return value
+        this when fetching values from the cache.
         """
 
         now = _now()
@@ -146,10 +164,7 @@ class AntiDogpiling(object):
     def _soft_invalidate(self, key, value):
         """
         Invalidate an anti-dogpiled value while keeping the properties of
-        anti-dogpiling. Example usage::
-
-            if self._is_anti_dogpiled(value):
-                self._soft_invalidate(key, value)
+        anti-dogpiling.
         """
 
         value.soft_timeout = 0

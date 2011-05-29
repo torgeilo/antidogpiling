@@ -35,7 +35,7 @@ Simply replace the ``BACKEND`` reference with the corresponding anti-dogpiled ba
 Change history
 ==============
 
-1.1 (2011-05-29)
+1.1.1 (2011-05-29)
 ----------------
 
 * Added support for Django 1.3 backends

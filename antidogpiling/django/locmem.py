@@ -10,7 +10,7 @@ def CacheClass(_, params):
     return Cache(locmem.CacheClass, _, params)
 
 
-def LocMemCache(name, params)
+def LocMemCache(name, params):
     """
     In-memory cache backend with support for anti-dogpiling.
     """

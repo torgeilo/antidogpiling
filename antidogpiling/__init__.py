@@ -64,7 +64,7 @@ the grace period, a new client is given the chance for an equally long time.
 
 
 __author__ = "Torgeir Lorange Østby"
-__version__ = "1.1"
+__version__ = "1.1.1"
 __docformat__ = "restructuredtext"
 
 

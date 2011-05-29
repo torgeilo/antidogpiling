@@ -112,7 +112,7 @@ class AntiDogpiling(object):
         self.hard_timeout_factor = int(kwargs.pop("hard_timeout_factor", 8))
         self.default_grace_time = int(kwargs.pop("default_grace_time", 60))
 
-    def _set_directly(self, key, value, timeout):
+    def _set_directly(self, key, value, timeout, **kwargs):
         """
         Some of the methods below need to be able to put values in the cache
         directly. A subclass must implement this method in order to allow that.
@@ -142,7 +142,7 @@ class AntiDogpiling(object):
 
         return isinstance(value, Wrapper)
 
-    def _apply_anti_dogpiling(self, key, value):
+    def _apply_anti_dogpiling(self, key, value, **kwargs):
         """
         Apply the anti-dogpiling mechanisms to the provided key and value. Use
         this when fetching values from the cache.
@@ -157,15 +157,15 @@ class AntiDogpiling(object):
         # We have a soft timeout. The client gets the grace period to produce
         # and set an updated value while everyone else gets the old value.
         value.soft_timeout = now + value.grace_time
-        self._set_directly(key, value, value.hard_timeout)
+        self._set_directly(key, value, value.hard_timeout, **kwargs)
 
         return None
 
-    def _soft_invalidate(self, key, value):
+    def _soft_invalidate(self, key, value, **kwargs):
         """
         Invalidate an anti-dogpiled value while keeping the properties of
         anti-dogpiling.
         """
 
         value.soft_timeout = 0
-        self._set_directly(key, value, value.hard_timeout)
+        self._set_directly(key, value, value.hard_timeout, **kwargs)

@@ -15,20 +15,20 @@ class MockBackendMixin(object):
     def __init__(self, *args, **kwargs):
         self._cache = Mock()
 
-    def add(self, key, value, timeout=None):
-        self._cache.add(key, value, timeout)
+    def add(self, key, value, timeout=None, version=None):
+        self._cache.add(key, value, timeout, version=version)
 
-    def set(self, key, value, timeout=None):
-        self._cache.set(key, value, timeout)
+    def set(self, key, value, timeout=None, version=None):
+        self._cache.set(key, value, timeout, version=version)
 
-    def get(self, key, default=None):
-        val = self._cache.get(key)
+    def get(self, key, default=None, version=None):
+        val = self._cache.get(key, version=version)
         if val is not None:
             return val
         return default
 
-    def delete(self, key):
-        self._cache.delete(key)
+    def delete(self, key, version=None):
+        self._cache.delete(key, version=version)
 
 
 class CacheMixinTestCase(TestCase):
@@ -69,7 +69,17 @@ class CacheMixinTestCase(TestCase):
         """
 
         self.cache.add("foo", "bar", timeout=1, hard=True)
-        self.mock.add.assert_called_with("foo", "bar", 1)
+        self.mock.add.assert_called_with("foo", "bar", 1, version=None)
+
+    def test_add_hard_with_version(self):
+        """
+        Test adding a value to the cache without anti-dogpiling. The cached
+        value should be added to the cache as is. It is basically the same test
+        as above, just with a version argument.
+        """
+
+        self.cache.add("foo", "bar", timeout=1, hard=True, version=2)
+        self.mock.add.assert_called_with("foo", "bar", 1, version=2)
 
     def test_set_soft(self):
         """
@@ -100,7 +110,17 @@ class CacheMixinTestCase(TestCase):
         """
 
         self.cache.set("foo", "bar", timeout=1, hard=True)
-        self.mock.set.assert_called_with("foo", "bar", 1)
+        self.mock.set.assert_called_with("foo", "bar", 1, version=None)
+
+    def test_set_hard_with_version(self):
+        """
+        Test setting a value in the cache without anti-dogpiling. The cached
+        value should be set as is. It is basically the same test as above, just
+        with a version argument.
+        """
+
+        self.cache.set("foo", "bar", timeout=1, hard=True, version=3)
+        self.mock.set.assert_called_with("foo", "bar", 1, version=3)
 
     def test_get_soft_cache_hit(self):
         """
@@ -117,7 +137,7 @@ class CacheMixinTestCase(TestCase):
 
         # Check the get method
         self.assertEquals(1, self.mock.get.call_count)
-        self.mock.get.assert_called_with("foo")
+        self.mock.get.assert_called_with("foo", version=None)
 
         # Check that the set method was not called
         self.assertFalse(self.mock.set.called)
@@ -139,7 +159,7 @@ class CacheMixinTestCase(TestCase):
 
         # Check the get method
         self.assertEquals(1, self.mock.get.call_count)
-        self.mock.get.assert_called_with("foo")
+        self.mock.get.assert_called_with("foo", version=None)
 
         # Check the set method and arguments
         self.assertEquals(1, self.mock.set.call_count)
@@ -166,7 +186,27 @@ class CacheMixinTestCase(TestCase):
 
         # Check the get method
         self.assertEquals(1, self.mock.get.call_count)
-        self.mock.get.assert_called_with("foo")
+        self.mock.get.assert_called_with("foo", version=None)
+
+        # Check that the set method was not called
+        self.assertFalse(self.mock.set.called)
+
+    def test_get_hard_cache_hit_with_version(self):
+        """
+        Test getting a non-anti-dogpiled value from the cache which has not
+        timed out. The cached value should just be returned without any futher
+        ado. It is basically the same test as above, just with a version
+        argument.
+        """
+
+        self.mock.get = Mock(return_value="bar")
+
+        value = self.cache.get("foo", version=4)
+        self.assertEquals("bar", value)
+
+        # Check the get method
+        self.assertEquals(1, self.mock.get.call_count)
+        self.mock.get.assert_called_with("foo", version=4)
 
         # Check that the set method was not called
         self.assertFalse(self.mock.set.called)
@@ -184,7 +224,7 @@ class CacheMixinTestCase(TestCase):
 
         # Check the get method
         self.assertEquals(1, self.mock.get.call_count)
-        self.mock.get.assert_called_with("foo")
+        self.mock.get.assert_called_with("foo", version=None)
 
     def test_delete_soft_adp(self):
         """
@@ -202,7 +242,7 @@ class CacheMixinTestCase(TestCase):
 
         # Check the get method
         self.assertEquals(1, self.mock.get.call_count)
-        self.mock.get.assert_called_with("foo")
+        self.mock.get.assert_called_with("foo", version=None)
 
         # Check the set method
         self.assertEquals(1, self.mock.set.call_count)
@@ -227,7 +267,26 @@ class CacheMixinTestCase(TestCase):
 
         # Check the delete method
         self.assertEquals(1, self.mock.delete.call_count)
-        self.mock.delete.assert_called_with("foo")
+        self.mock.delete.assert_called_with("foo", version=None)
+
+        # Check other methods
+        self.assertFalse(self.mock.get.called)
+        self.assertFalse(self.mock.set.called)
+
+    def test_delete_hard_adp_with_version(self):
+        """
+        Test that hard-deleting an anti-dogpiled value actually deletes it. It
+        is basically the same test as above, just with a version argument.
+        """
+
+        now = int(time.time())
+        self.mock.get = Mock(return_value=Wrapper("bar", now, 1000, 60))
+
+        self.cache.delete("foo", hard=True, version=5)
+
+        # Check the delete method
+        self.assertEquals(1, self.mock.delete.call_count)
+        self.mock.delete.assert_called_with("foo", version=5)
 
         # Check other methods
         self.assertFalse(self.mock.get.called)
@@ -244,11 +303,11 @@ class CacheMixinTestCase(TestCase):
 
         # Check the get method
         self.assertEquals(1, self.mock.get.call_count)
-        self.mock.get.assert_called_with("foo")
+        self.mock.get.assert_called_with("foo", version=None)
 
         # Check the delete method
         self.assertEquals(1, self.mock.delete.call_count)
-        self.mock.delete.assert_called_with("foo")
+        self.mock.delete.assert_called_with("foo", version=None)
 
         # Check the set method
         self.assertFalse(self.mock.set.called)
@@ -264,7 +323,7 @@ class CacheMixinTestCase(TestCase):
 
         # Check the delete method
         self.assertEquals(1, self.mock.delete.call_count)
-        self.mock.delete.assert_called_with("foo")
+        self.mock.delete.assert_called_with("foo", version=None)
 
         # Check other methods
         self.assertFalse(self.mock.get.called)

@@ -33,14 +33,15 @@ class Cache(AntiDogpiling):
         AntiDogpiling.__init__(self, **params)
         CacheClass.__init__(self, param, params)
 
-    def _set_directly(self, key, value, timeout):
+    def _set_directly(self, key, value, timeout, **kwargs):
         """
         Overriding as required by the AntiDogpiling class.
         """
 
-        super(Cache, self).set(key, value, timeout=timeout)
+        super(Cache, self).set(key, value, timeout=timeout, **kwargs)
 
-    def add(self, key, value, timeout=None, hard=False, grace_time=None):
+    def add(self, key, value, timeout=None, hard=False, grace_time=None,
+            **kwargs):
         """
         Cache add with support for anti-dogpiling, enabled by default.
         """
@@ -50,9 +51,10 @@ class Cache(AntiDogpiling):
         if not hard:
             value, timeout = self._add_anti_dogpiling(value, timeout,
                                                       grace_time=grace_time)
-        super(Cache, self).add(key, value, timeout=timeout)
+        super(Cache, self).add(key, value, timeout=timeout, **kwargs)
 
-    def set(self, key, value, timeout=None, hard=False, grace_time=None):
+    def set(self, key, value, timeout=None, hard=False, grace_time=None,
+            **kwargs):
         """
         Cache set with support for anti-dogpiling, enabled by default.
         """
@@ -62,30 +64,30 @@ class Cache(AntiDogpiling):
         if not hard:
             value, timeout = self._add_anti_dogpiling(value, timeout,
                                                       grace_time=grace_time)
-        super(Cache, self).set(key, value, timeout=timeout)
+        super(Cache, self).set(key, value, timeout=timeout, **kwargs)
 
-    def get(self, key, default=None):
+    def get(self, key, default=None, **kwargs):
         """
         Cache get with support for anti-dogpiling.
         """
 
-        value = super(Cache, self).get(key)
+        value = super(Cache, self).get(key, **kwargs)
         if self._is_anti_dogpiled(value):
-            value = self._apply_anti_dogpiling(key, value)
+            value = self._apply_anti_dogpiling(key, value, **kwargs)
         if value is None:
             return default
         return value
 
-    def delete(self, key, hard=False):
+    def delete(self, key, hard=False, **kwargs):
         """
         Cache delete with support for anti-dogpiling (soft invalidation),
         enabled by default.
         """
 
         if not hard:
-            value = super(Cache, self).get(key)
+            value = super(Cache, self).get(key, **kwargs)
             if self._is_anti_dogpiled(value):
-                self._soft_invalidate(key, value)
+                self._soft_invalidate(key, value, **kwargs)
                 return
 
-        super(Cache, self).delete(key)
+        super(Cache, self).delete(key, **kwargs)

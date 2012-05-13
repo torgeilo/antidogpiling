@@ -36,7 +36,7 @@ Change history
 ==============
 
 1.1.1 (2011-05-29)
-----------------
+------------------
 
 * Added support for Django 1.3 backends
 

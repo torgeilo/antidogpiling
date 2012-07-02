@@ -19,7 +19,7 @@ setup(
         "Programming Language :: Python",
         "Topic :: Software Development",
     ),
-    keywords="caching anti-dogpiling",
+    keywords="cache caching anti-dogpiling dogpiling",
     license="BSD",
     packages=find_packages(exclude=["tests"]),
     zip_safe=True,

@@ -15,30 +15,23 @@ class Cache(AntiDogpiling):
     of these in Memcached.
     """
 
-    def __init__(self, CacheClass, param, params):
+    def __init__(self, DjangoBackend, param, params):
         """
-        Initialize with a Django cache backend as mixin. Example usage::
+        Initialize with a Django cache backend. Example usage::
 
             from django.core.cache.backends import locmem
             cache = Cache(locmem.CacheClass, None, params)
         """
 
-        # Add mixin
-        if CacheClass not in Cache.__bases__:
-            if len(Cache.__bases__) > 1:
-                raise RuntimeError("Already mixed")
-            Cache.__bases__ += (CacheClass,)
-
-        # Initialize subclasses
-        AntiDogpiling.__init__(self, **params)
-        CacheClass.__init__(self, param, params)
+        super(Cache, self).__init__(**params)
+        self._backend = DjangoBackend(param, params)
 
     def _set_directly(self, key, value, timeout, **kwargs):
         """
         Overriding as required by the AntiDogpiling class.
         """
 
-        super(Cache, self).set(key, value, timeout=timeout, **kwargs)
+        self._backend.set(key, value, timeout=timeout, **kwargs)
 
     def add(self, key, value, timeout=None, hard=False, grace_time=None,
             **kwargs):
@@ -51,7 +44,7 @@ class Cache(AntiDogpiling):
         if not hard:
             value, timeout = self._add_anti_dogpiling(value, timeout,
                                                       grace_time=grace_time)
-        super(Cache, self).add(key, value, timeout=timeout, **kwargs)
+        self._backend.add(key, value, timeout=timeout, **kwargs)
 
     def set(self, key, value, timeout=None, hard=False, grace_time=None,
             **kwargs):
@@ -64,14 +57,14 @@ class Cache(AntiDogpiling):
         if not hard:
             value, timeout = self._add_anti_dogpiling(value, timeout,
                                                       grace_time=grace_time)
-        super(Cache, self).set(key, value, timeout=timeout, **kwargs)
+        self._backend.set(key, value, timeout=timeout, **kwargs)
 
     def get(self, key, default=None, **kwargs):
         """
         Cache get with support for anti-dogpiling.
         """
 
-        value = super(Cache, self).get(key, **kwargs)
+        value = self._backend.get(key, **kwargs)
         if self._is_anti_dogpiled(value):
             value = self._apply_anti_dogpiling(key, value, **kwargs)
         if value is None:
@@ -85,9 +78,24 @@ class Cache(AntiDogpiling):
         """
 
         if not hard:
-            value = super(Cache, self).get(key, **kwargs)
+            value = self._backend.get(key, **kwargs)
             if self._is_anti_dogpiled(value):
                 self._soft_invalidate(key, value, **kwargs)
                 return
 
-        super(Cache, self).delete(key, **kwargs)
+        self._backend.delete(key, **kwargs)
+
+    def __getattr__(self, name):
+        """
+        Forward unrecognized attribute access (incr, decr, get_many, etc) to
+        the backend.
+        """
+
+        return getattr(self._backend, name)
+
+    def __contains__(self, key):
+        """
+        Forward any contains calls to the backend.
+        """
+
+        return key in self._backend

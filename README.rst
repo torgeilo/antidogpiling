@@ -88,10 +88,17 @@ Caveats in the Django backends
 
 - The ``incr`` and ``decr`` are not anti-dogpiled due to being atomic in Memcached (at least). The anti-dogpiling would not be atomic, unless somehow implemented with locks. **Note:** When initializing a value for being incremented or decremented, one *has* to specify ``hard=True`` when calling the ``set`` method. Otherwise, the anti-dogpiling kicks in and stores a complex value which cannot be incremented (a ``ValueError`` is raised)!
 - The ``set_many``, ``get_many``, and ``delete_many`` methods are not anti-dogpiled, due to a combination of laziness and all the decisions that would have to be made about how to handle soft timeouts, etc.
-- It is not possible to use two different anti-dogpiled Django backends at the same time in the same project. The current dynamic mixin in the common Django backend implementation prohibits this, unfortunately. Still, using one or more instances of the same anti-dogpiled backend works fine.
 
 Change history
 ==============
+
+1.1.3 (2012-07-19)
+------------------
+
+* Replaced the dynamic mixin with a regular object reference in the common
+  Django backend, voiding the issue with using multiple different anti-dogpiled
+  backends at the same time.
+* Added dummy Django backend.
 
 1.1.2 (2012-07-02)
 ------------------

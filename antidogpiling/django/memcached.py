@@ -12,7 +12,7 @@ def CacheClass(server, params):
 
 def MemcachedCache(server, params):
     """
-    Memcached backed with support for anti-dogpiling, using python-memcached.
+    Memcached backend with support for anti-dogpiling, using python-memcached.
     """
 
     return Cache(memcached.MemcachedCache, server, params)

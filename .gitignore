@@ -1,6 +1,7 @@
 *.egg-info
 *.py?
 .installed.cfg
+.coverage
 bin/
 eggs/
 parts/
